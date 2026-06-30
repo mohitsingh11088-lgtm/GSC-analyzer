@@ -1,47 +1,77 @@
 import streamlit as st
 import pandas as pd
 
-st.title("🚀 GSC Content Refresh Analyzer")
+st.title("🚀 GSC Content Refresh Analyzer (Pro Version)")
 
-st.write("Upload Google Search Console CSV export")
+st.write("Upload your Google Search Console CSV export below")
 
 file = st.file_uploader("Upload CSV", type=["csv"])
 
 
 # -----------------------------
-# Analysis Logic
+# CLEANING FUNCTION (IMPORTANT)
+# -----------------------------
+def clean_number(value):
+    try:
+        if pd.isna(value):
+            return 0
+
+        if isinstance(value, str):
+            value = value.replace("%", "").strip()
+
+            if value in ["", "—", "-", "null", "None"]:
+                return 0
+
+        return float(value)
+
+    except:
+        return 0
+
+
+# -----------------------------
+# ANALYSIS ENGINE
 # -----------------------------
 def analyze(row):
 
-    clicks = row["Clicks"]
-    impressions = row["Impressions"]
-    ctr = row["CTR"]
-    position = row["Position"]
+    clicks = clean_number(row.get("Clicks", 0))
+    impressions = clean_number(row.get("Impressions", 0))
+    ctr = clean_number(row.get("CTR", 0))
+    position = clean_number(row.get("Position", 0))
 
     score = 0
     actions = []
 
-    # High impressions but low CTR
+    # -----------------------------
+    # CTR ISSUE (HIGH IMPRESSIONS)
+    # -----------------------------
     if impressions > 1000 and ctr < 2:
         score += 40
-        actions.append("Improve Title & Meta Description (CTR issue)")
+        actions.append("Improve Title & Meta Description (Low CTR)")
 
-    # High impressions but low clicks
+    # -----------------------------
+    # HIGH IMPRESSIONS BUT LOW CLICKS
+    # -----------------------------
     if impressions > 1000 and clicks < 50:
         score += 30
-        actions.append("Content not attracting clicks → rewrite snippet")
+        actions.append("Rewrite title to improve clickability")
 
-    # Bad position
+    # -----------------------------
+    # POOR RANKING
+    # -----------------------------
     if position > 10:
         score += 20
-        actions.append("Improve SEO content depth + internal linking")
+        actions.append("Improve content depth + internal linking")
 
-    # Low performance page
+    # -----------------------------
+    # VERY LOW TRAFFIC PAGE
+    # -----------------------------
     if clicks < 10:
         score += 10
-        actions.append("Add FAQs + expand content")
+        actions.append("Expand content + add FAQs section")
 
-    # Priority
+    # -----------------------------
+    # PRIORITY LEVEL
+    # -----------------------------
     if score >= 60:
         priority = "HIGH 🔴"
     elif score >= 30:
@@ -53,13 +83,13 @@ def analyze(row):
 
 
 # -----------------------------
-# MAIN
+# MAIN APP
 # -----------------------------
 if file:
 
     df = pd.read_csv(file)
 
-    st.write("### Raw Data Preview")
+    st.write("### 📄 Raw Data Preview")
     st.dataframe(df)
 
     results = []
@@ -69,13 +99,13 @@ if file:
         priority, actions = analyze(row)
 
         results.append({
-            "Page": row["Page"],
-            "Clicks": row["Clicks"],
-            "Impressions": row["Impressions"],
-            "CTR": row["CTR"],
-            "Position": row["Position"],
+            "Page": row.get("Page", "N/A"),
+            "Clicks": clean_number(row.get("Clicks", 0)),
+            "Impressions": clean_number(row.get("Impressions", 0)),
+            "CTR": clean_number(row.get("CTR", 0)),
+            "Position": clean_number(row.get("Position", 0)),
             "Priority": priority,
-            "Recommendations": " | ".join(actions)
+            "Recommendations": " | ".join(actions) if actions else "No action needed"
         })
 
     result_df = pd.DataFrame(results)
@@ -83,8 +113,10 @@ if file:
     st.write("### 🚀 Content Refresh Recommendations")
     st.dataframe(result_df)
 
+    # Download button
     st.download_button(
-        "Download Report",
-        result_df.to_csv(index=False),
-        "gsc_report.csv"
+        label="📥 Download Report",
+        data=result_df.to_csv(index=False),
+        file_name="gsc_content_refresh_report.csv",
+        mime="text/csv"
     )
