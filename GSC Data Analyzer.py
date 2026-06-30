@@ -1,12 +1,17 @@
 import streamlit as st
 import pandas as pd
 
-st.title("🚀 GSC Content Refresh Analyzer (Final Stable Version)")
+st.set_page_config(
+    page_title="SEO Content Intelligence",
+    page_icon="🚀",
+    layout="wide"
+)
 
-st.write("Upload your Google Search Console CSV export")
+st.title("🚀 SEO Content Refresh Intelligence Tool")
+st.caption("Upload Google Search Console CSV to find optimization opportunities")
 
 
-file = st.file_uploader("Upload CSV", type=["csv"])
+file = st.file_uploader("Upload GSC CSV", type=["csv"])
 
 
 # -----------------------------
@@ -42,27 +47,22 @@ def analyze(row):
     score = 0
     actions = []
 
-    # 🔴 CTR issue
     if impressions > 1000 and ctr < 2:
         score += 40
-        actions.append("Improve Title & Meta Description (Low CTR)")
+        actions.append("Improve Title & Meta Description")
 
-    # 🔴 Low clicks despite impressions
     if impressions > 1000 and clicks < 50:
         score += 30
-        actions.append("Rewrite title to improve click-through rate")
+        actions.append("Improve CTR with better headline")
 
-    # 🔴 Ranking issue
     if position > 10:
         score += 20
         actions.append("Improve content depth + internal linking")
 
-    # 🔴 Weak traffic page
     if clicks < 10:
         score += 10
-        actions.append("Expand content + add FAQs section")
+        actions.append("Expand content + add FAQs")
 
-    # Priority logic
     if score >= 60:
         priority = "HIGH 🔴"
     elif score >= 30:
@@ -80,21 +80,20 @@ if file:
 
     df = pd.read_csv(file)
 
-    st.write("### 📄 Raw Data Preview")
-    st.dataframe(df)
+    # -----------------------------
+    # CLEAN UI HEADER
+    # -----------------------------
+    st.success("File uploaded successfully ✔")
 
-    st.write("### 📌 Detected Columns")
-    st.write(list(df.columns))
-
+    # -----------------------------
+    # RESULTS PROCESSING
+    # -----------------------------
     results = []
 
     for _, row in df.iterrows():
 
         priority, actions = analyze(row)
 
-        # -----------------------------
-        # FIXED PAGE COLUMN LOGIC
-        # -----------------------------
         page = (
             row.get("Top pages")
             or row.get("Page")
@@ -115,12 +114,36 @@ if file:
 
     result_df = pd.DataFrame(results)
 
-    st.write("### 🚀 Content Refresh Recommendations")
-    st.dataframe(result_df)
+    # -----------------------------
+    # FILTERS (NEW UX)
+    # -----------------------------
+    col1, col2, col3 = st.columns(3)
 
+    with col1:
+        priority_filter = st.selectbox(
+            "Filter by Priority",
+            ["ALL", "HIGH 🔴", "MEDIUM 🟠", "LOW 🟢"]
+        )
+
+    if priority_filter != "ALL":
+        result_df = result_df[result_df["Priority"] == priority_filter]
+
+    # -----------------------------
+    # TABLE OUTPUT (CLEAN)
+    # -----------------------------
+    st.subheader("📊 Content Refresh Recommendations")
+
+    st.dataframe(
+        result_df,
+        use_container_width=True
+    )
+
+    # -----------------------------
+    # DOWNLOAD BUTTON
+    # -----------------------------
     st.download_button(
-        label="📥 Download Report",
-        data=result_df.to_csv(index=False),
-        file_name="gsc_content_refresh_report.csv",
+        "📥 Download SEO Report",
+        result_df.to_csv(index=False),
+        "seo_content_refresh_report.csv",
         mime="text/csv"
     )
