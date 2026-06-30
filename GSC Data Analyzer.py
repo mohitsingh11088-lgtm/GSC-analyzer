@@ -1,21 +1,44 @@
 import streamlit as st
 import pandas as pd
 
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
 st.set_page_config(
     page_title="SEO Content Intelligence",
     page_icon="🚀",
     layout="wide"
 )
 
-st.title("🚀 SEO Content Refresh Intelligence Tool")
-st.caption("Upload Google Search Console CSV to find optimization opportunities")
+# -----------------------------
+# THEME TOGGLE (DARK / LIGHT)
+# -----------------------------
+theme = st.sidebar.toggle("🌙 Dark Mode", value=True)
 
+if theme:
+    st.markdown(
+        """
+        <style>
+        body {
+            background-color: #0e1117;
+            color: white;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# -----------------------------
+# TITLE
+# -----------------------------
+st.title("🚀 SEO Content Refresh Intelligence Tool")
+st.caption("Upload Google Search Console CSV to get SEO optimization insights")
 
 file = st.file_uploader("Upload GSC CSV", type=["csv"])
 
 
 # -----------------------------
-# CLEANING FUNCTION
+# CLEAN FUNCTION
 # -----------------------------
 def clean_number(value):
     try:
@@ -49,11 +72,11 @@ def analyze(row):
 
     if impressions > 1000 and ctr < 2:
         score += 40
-        actions.append("Improve Title & Meta Description")
+        actions.append("Improve Title & Meta Description (CTR issue)")
 
     if impressions > 1000 and clicks < 50:
         score += 30
-        actions.append("Improve CTR with better headline")
+        actions.append("Rewrite title to increase clicks")
 
     if position > 10:
         score += 20
@@ -61,7 +84,7 @@ def analyze(row):
 
     if clicks < 10:
         score += 10
-        actions.append("Expand content + add FAQs")
+        actions.append("Expand content + add FAQs section")
 
     if score >= 60:
         priority = "HIGH 🔴"
@@ -80,14 +103,8 @@ if file:
 
     df = pd.read_csv(file)
 
-    # -----------------------------
-    # CLEAN UI HEADER
-    # -----------------------------
     st.success("File uploaded successfully ✔")
 
-    # -----------------------------
-    # RESULTS PROCESSING
-    # -----------------------------
     results = []
 
     for _, row in df.iterrows():
@@ -115,9 +132,9 @@ if file:
     result_df = pd.DataFrame(results)
 
     # -----------------------------
-    # FILTERS (NEW UX)
+    # FILTERS
     # -----------------------------
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
         priority_filter = st.selectbox(
@@ -129,17 +146,25 @@ if file:
         result_df = result_df[result_df["Priority"] == priority_filter]
 
     # -----------------------------
-    # TABLE OUTPUT (CLEAN)
+    # EXPANDABLE UI (NO TEXT CUTTING)
     # -----------------------------
     st.subheader("📊 Content Refresh Recommendations")
 
-    st.dataframe(
-        result_df,
-        use_container_width=True
-    )
+    for _, row in result_df.iterrows():
+
+        with st.expander(f"{row['Priority']} | {row['Page']}"):
+
+            st.write("### SEO Metrics")
+            st.write("Clicks:", row["Clicks"])
+            st.write("Impressions:", row["Impressions"])
+            st.write("CTR:", row["CTR"])
+            st.write("Position:", row["Position"])
+
+            st.write("### Recommendations")
+            st.write(row["Recommendations"])
 
     # -----------------------------
-    # DOWNLOAD BUTTON
+    # DOWNLOAD REPORT
     # -----------------------------
     st.download_button(
         "📥 Download SEO Report",
