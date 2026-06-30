@@ -2,13 +2,13 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(
-    page_title="SEO Content Intelligence",
+    page_title="Content Gap AI System",
     page_icon="🚀",
     layout="wide"
 )
 
-st.title("🚀 SEO Content Intelligence Dashboard")
-st.caption("Analyze GSC Pages + Queries for content refresh opportunities")
+st.title("🚀 Content Gap AI System (GSC Powered)")
+st.caption("Find missing content opportunities from Search Console data")
 
 file = st.file_uploader("Upload GSC CSV", type=["csv"])
 
@@ -20,72 +20,65 @@ def clean_number(value):
     try:
         if pd.isna(value):
             return 0
-
         if isinstance(value, str):
             value = value.replace("%", "").strip()
             if value in ["", "—", "-", "null", "None"]:
                 return 0
-
         return float(value)
-
     except:
         return 0
 
 
 # -----------------------------
-# PAGE ANALYSIS
+# SIMPLE TOPIC CLUSTERING
 # -----------------------------
-def page_analysis(clicks, impressions, ctr, position):
+def get_topic(query):
 
-    score = 0
-    actions = []
+    q = query.lower()
 
-    if impressions > 1000 and ctr < 2:
-        score += 40
-        actions.append("Improve Title & Meta Description")
-
-    if impressions > 1000 and clicks < 50:
-        score += 30
-        actions.append("Improve CTR (rewrite title)")
-
-    if position > 10:
-        score += 20
-        actions.append("Improve content depth + internal linking")
-
-    if clicks < 10:
-        score += 10
-        actions.append("Expand content + FAQs")
-
-    if score >= 60:
-        priority = "HIGH 🔴"
-    elif score >= 30:
-        priority = "MEDIUM 🟠"
+    if any(x in q for x in ["seo", "ranking", "google"]):
+        return "SEO"
+    elif any(x in q for x in ["ads", "ppc", "google ads"]):
+        return "Paid Ads"
+    elif any(x in q for x in ["content", "blog", "writing"]):
+        return "Content Marketing"
+    elif any(x in q for x in ["social", "instagram", "facebook"]):
+        return "Social Media"
+    elif any(x in q for x in ["tools", "software", "crm"]):
+        return "Tools / Software"
+    elif any(x in q for x in ["how", "what", "why", "guide"]):
+        return "Educational / How-to"
     else:
-        priority = "LOW 🟢"
-
-    return priority, actions
+        return "General"
 
 
 # -----------------------------
-# QUERY ANALYSIS (NEW)
+# BLOG IDEA GENERATOR
 # -----------------------------
-def query_analysis(query, clicks, impressions, ctr, position):
+def blog_idea(topic, query):
+    return f"Complete Guide to {query} in 2026 ({topic})"
 
-    suggestions = []
+
+# -----------------------------
+# GAP DETECTION
+# -----------------------------
+def find_gap(impressions, ctr, position):
+
+    gaps = []
 
     if impressions > 500 and ctr < 2:
-        suggestions.append("Improve title targeting this query")
+        gaps.append("Low CTR → improve title/meta")
 
-    if position > 10:
-        suggestions.append(f"Create dedicated section for: '{query}'")
+    if impressions > 500 and position > 10:
+        gaps.append("Ranking gap → create better content page")
 
-    if clicks < 5 and impressions > 100:
-        suggestions.append(f"Content mismatch — align content with '{query}' intent")
+    if impressions > 100 and ctr < 1:
+        gaps.append("High demand but weak visibility")
 
-    if not suggestions:
-        suggestions.append("No major issue")
+    if not gaps:
+        gaps.append("No major gap")
 
-    return " | ".join(suggestions)
+    return " | ".join(gaps)
 
 
 # -----------------------------
@@ -97,88 +90,64 @@ if file:
 
     st.success("File uploaded successfully ✔")
 
-    st.write("### 📄 Raw Data Preview")
+    st.write("### 📄 Data Preview")
     st.dataframe(df)
-
-    # -----------------------------
-    # MODE DETECTION
-    # -----------------------------
-    mode = st.selectbox("Choose Analysis Mode", ["Pages", "Queries"])
 
     results = []
 
-    # -----------------------------
-    # PAGE MODE
-    # -----------------------------
-    if mode == "Pages":
+    for _, row in df.iterrows():
 
-        for _, row in df.iterrows():
+        query = row.get("Query") or row.get("Top queries") or "Unknown Query"
 
-            clicks = clean_number(row.get("Clicks", 0))
-            impressions = clean_number(row.get("Impressions", 0))
-            ctr = clean_number(row.get("CTR", 0))
-            position = clean_number(row.get("Position", 0))
+        clicks = clean_number(row.get("Clicks", 0))
+        impressions = clean_number(row.get("Impressions", 0))
+        ctr = clean_number(row.get("CTR", 0))
+        position = clean_number(row.get("Position", 0))
 
-            priority, actions = page_analysis(clicks, impressions, ctr, position)
+        topic = get_topic(query)
 
-            page = (
-                row.get("Top pages")
-                or row.get("Page")
-                or row.get("Landing Page")
-                or row.get("URL")
-                or "Unknown Page"
-            )
+        gap = find_gap(impressions, ctr, position)
 
-            results.append({
-                "Page": page,
-                "Clicks": clicks,
-                "Impressions": impressions,
-                "CTR": ctr,
-                "Position": position,
-                "Priority": priority,
-                "Recommendations": " | ".join(actions)
-            })
-
-    # -----------------------------
-    # QUERY MODE (NEW)
-    # -----------------------------
-    else:
-
-        for _, row in df.iterrows():
-
-            query = row.get("Query") or row.get("Top queries") or "Unknown Query"
-
-            clicks = clean_number(row.get("Clicks", 0))
-            impressions = clean_number(row.get("Impressions", 0))
-            ctr = clean_number(row.get("CTR", 0))
-            position = clean_number(row.get("Position", 0))
-
-            suggestion = query_analysis(query, clicks, impressions, ctr, position)
-
-            results.append({
-                "Query": query,
-                "Clicks": clicks,
-                "Impressions": impressions,
-                "CTR": ctr,
-                "Position": position,
-                "Suggestions": suggestion
-            })
+        results.append({
+            "Query": query,
+            "Topic Cluster": topic,
+            "Clicks": clicks,
+            "Impressions": impressions,
+            "CTR": ctr,
+            "Position": position,
+            "Content Gap": gap,
+            "Blog Idea": blog_idea(topic, query)
+        })
 
     result_df = pd.DataFrame(results)
 
     # -----------------------------
-    # FILTER
+    # FILTERS
     # -----------------------------
-    st.subheader("📊 Results")
+    st.subheader("📊 Content Gap Opportunities")
 
+    col1, col2 = st.columns(2)
+
+    with col1:
+        topic_filter = st.selectbox(
+            "Filter by Topic",
+            ["ALL"] + sorted(result_df["Topic Cluster"].unique())
+        )
+
+    if topic_filter != "ALL":
+        result_df = result_df[result_df["Topic Cluster"] == topic_filter]
+
+    # -----------------------------
+    # TABLE VIEW
+    # -----------------------------
     st.dataframe(result_df, use_container_width=True)
 
     # -----------------------------
     # DOWNLOAD
     # -----------------------------
     st.download_button(
-        "📥 Download Report",
+        "📥 Download Content Gap Report",
         result_df.to_csv(index=False),
-        "seo_insights_report.csv",
+        "content_gap_ai_report.csv",
         mime="text/csv"
     )
