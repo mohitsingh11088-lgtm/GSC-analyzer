@@ -1,15 +1,16 @@
 import streamlit as st
 import pandas as pd
 
-st.title("🚀 GSC Content Refresh Analyzer (Pro Version)")
+st.title("🚀 GSC Content Refresh Analyzer (Final Stable Version)")
 
-st.write("Upload your Google Search Console CSV export below")
+st.write("Upload your Google Search Console CSV export")
+
 
 file = st.file_uploader("Upload CSV", type=["csv"])
 
 
 # -----------------------------
-# CLEANING FUNCTION (IMPORTANT)
+# CLEANING FUNCTION
 # -----------------------------
 def clean_number(value):
     try:
@@ -41,37 +42,27 @@ def analyze(row):
     score = 0
     actions = []
 
-    # -----------------------------
-    # CTR ISSUE (HIGH IMPRESSIONS)
-    # -----------------------------
+    # 🔴 CTR issue
     if impressions > 1000 and ctr < 2:
         score += 40
         actions.append("Improve Title & Meta Description (Low CTR)")
 
-    # -----------------------------
-    # HIGH IMPRESSIONS BUT LOW CLICKS
-    # -----------------------------
+    # 🔴 Low clicks despite impressions
     if impressions > 1000 and clicks < 50:
         score += 30
-        actions.append("Rewrite title to improve clickability")
+        actions.append("Rewrite title to improve click-through rate")
 
-    # -----------------------------
-    # POOR RANKING
-    # -----------------------------
+    # 🔴 Ranking issue
     if position > 10:
         score += 20
         actions.append("Improve content depth + internal linking")
 
-    # -----------------------------
-    # VERY LOW TRAFFIC PAGE
-    # -----------------------------
+    # 🔴 Weak traffic page
     if clicks < 10:
         score += 10
         actions.append("Expand content + add FAQs section")
 
-    # -----------------------------
-    # PRIORITY LEVEL
-    # -----------------------------
+    # Priority logic
     if score >= 60:
         priority = "HIGH 🔴"
     elif score >= 30:
@@ -92,14 +83,28 @@ if file:
     st.write("### 📄 Raw Data Preview")
     st.dataframe(df)
 
+    st.write("### 📌 Detected Columns")
+    st.write(list(df.columns))
+
     results = []
 
     for _, row in df.iterrows():
 
         priority, actions = analyze(row)
 
+        # -----------------------------
+        # FIXED PAGE COLUMN LOGIC
+        # -----------------------------
+        page = (
+            row.get("Top pages")
+            or row.get("Page")
+            or row.get("Landing Page")
+            or row.get("URL")
+            or "Unknown Page"
+        )
+
         results.append({
-            "Page": row.get("Page", "N/A"),
+            "Page": page,
             "Clicks": clean_number(row.get("Clicks", 0)),
             "Impressions": clean_number(row.get("Impressions", 0)),
             "CTR": clean_number(row.get("CTR", 0)),
@@ -113,7 +118,6 @@ if file:
     st.write("### 🚀 Content Refresh Recommendations")
     st.dataframe(result_df)
 
-    # Download button
     st.download_button(
         label="📥 Download Report",
         data=result_df.to_csv(index=False),
