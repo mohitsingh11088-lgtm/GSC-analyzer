@@ -11,9 +11,9 @@ st.title("🚀 AI SEO Content Intelligence (Groq Powered)")
 st.caption("Hybrid SEO Engine: Rules + AI Insights")
 
 # -----------------------------
-# GROQ API KEY (PUT HERE)
+# GROQ API KEY (MOVE TO SECRETS LATER)
 # -----------------------------
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "YOUR_NEW_API_KEY_HERE"
 
 client = OpenAI(
     api_key=GROQ_API_KEY,
@@ -33,33 +33,36 @@ def clean_number(v):
 
 
 # -----------------------------
-# BASIC RULE ENGINE (FILTER)
+# RULE ENGINE (FAST FILTER)
 # -----------------------------
 def rule_engine(clicks, impressions, ctr, position):
 
     flags = []
 
+    # ranking issue (priority driver)
     if position > 15:
         flags.append("ranking_issue")
 
+    # CTR issue only if ranking is good
     if position <= 10 and ctr < 2:
         flags.append("ctr_issue")
 
-    if impressions > 10000 and ctr < 1:
+    # high impressions but low CTR = intent issue
+    if impressions > 8000 and ctr < 1:
         flags.append("intent_issue")
 
     return flags
 
 
 # -----------------------------
-# GROQ AI ANALYSIS
+# AI ANALYSIS (GROQ)
 # -----------------------------
 def groq_analysis(data):
 
     prompt = f"""
 You are a senior SEO strategist.
 
-Analyze this Google Search Console row:
+Analyze this Google Search Console data:
 
 {data}
 
@@ -67,7 +70,7 @@ Return:
 1. Root cause
 2. Exact fix (no generic advice)
 3. Priority (High/Medium/Low)
-4. Expected impact
+4. Expected impact in traffic
 """
 
     response = client.chat.completions.create(
@@ -90,26 +93,32 @@ if file:
 
     df = pd.read_csv(file)
 
-    st.subheader("📄 Raw Data")
+    # -----------------------------
+    # LIMIT DATA (IMPORTANT FOR SPEED)
+    # -----------------------------
+    df = df.head(25)
+
+    st.subheader("📄 Raw Data Preview")
     st.dataframe(df, use_container_width=True)
 
     results = []
 
-    for _, row in df.iterrows():
+    # -----------------------------
+    # FAST LOOP (NO iterrows)
+    # -----------------------------
+    for row in df.itertuples():
 
-        clicks = clean_number(row.get("Clicks", 0))
-        impressions = clean_number(row.get("Impressions", 0))
-        ctr = clean_number(row.get("CTR", 0))
-        position = clean_number(row.get("Position", 0))
+        clicks = clean_number(getattr(row, "Clicks", 0))
+        impressions = clean_number(getattr(row, "Impressions", 0))
+        ctr = clean_number(getattr(row, "CTR", 0))
+        position = clean_number(getattr(row, "Position", 0))
 
-        page = row.get("Top pages") or row.get("Page") or "Unknown"
+        page = getattr(row, "Top_pages", None) or getattr(row, "Page", None) or "Unknown"
 
-        # -----------------------------
         # STEP 1: RULE FILTER
-        # -----------------------------
         flags = rule_engine(clicks, impressions, ctr, position)
 
-        # Only send important rows to AI
+        # STEP 2: ONLY SEND IMPORTANT ROWS TO AI
         if flags:
 
             ai_input = {
@@ -118,12 +127,9 @@ if file:
                 "Impressions": impressions,
                 "CTR": ctr,
                 "Position": position,
-                "Detected Issues": flags
+                "Issues": flags
             }
 
-            # -----------------------------
-            # STEP 2: GROQ AI ANALYSIS
-            # -----------------------------
             ai_result = groq_analysis(ai_input)
 
         else:
@@ -144,7 +150,9 @@ if file:
 
     st.dataframe(result_df, use_container_width=True)
 
-    # Download
+    # -----------------------------
+    # DOWNLOAD REPORT
+    # -----------------------------
     st.download_button(
         "📥 Download Report",
         result_df.to_csv(index=False),
