@@ -1,184 +1,153 @@
 import streamlit as st
 import pandas as pd
+from openai import OpenAI
 
-st.set_page_config(
-    page_title="SEO Content Intelligence",
-    page_icon="🚀",
-    layout="wide"
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
+st.set_page_config(page_title="AI SEO Intelligence", layout="wide")
+
+st.title("🚀 AI SEO Content Intelligence (Groq Powered)")
+st.caption("Hybrid SEO Engine: Rules + AI Insights")
+
+# -----------------------------
+# GROQ API KEY (PUT HERE)
+# -----------------------------
+GROQ_API_KEY = "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"
+
+client = OpenAI(
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1"
 )
-
-st.title("🚀 SEO Content Intelligence Dashboard")
-st.caption("Analyze GSC Pages + Queries for content refresh opportunities")
-
-file = st.file_uploader("Upload GSC CSV", type=["csv"])
-
 
 # -----------------------------
 # CLEAN FUNCTION
 # -----------------------------
-def clean_number(value):
+def clean_number(v):
     try:
-        if pd.isna(value):
+        if pd.isna(v):
             return 0
-
-        if isinstance(value, str):
-            value = value.replace("%", "").strip()
-            if value in ["", "—", "-", "null", "None"]:
-                return 0
-
-        return float(value)
-
+        return float(str(v).replace("%", "").strip())
     except:
         return 0
 
 
 # -----------------------------
-# PAGE ANALYSIS
+# BASIC RULE ENGINE (FILTER)
 # -----------------------------
-def page_analysis(clicks, impressions, ctr, position):
+def rule_engine(clicks, impressions, ctr, position):
 
-    score = 0
-    actions = []
+    flags = []
 
-    if impressions > 1000 and ctr < 2:
-        score += 40
-        actions.append("Improve Title & Meta Description")
+    if position > 15:
+        flags.append("ranking_issue")
 
-    if impressions > 1000 and clicks < 50:
-        score += 30
-        actions.append("Improve CTR (rewrite title)")
+    if position <= 10 and ctr < 2:
+        flags.append("ctr_issue")
 
-    if position > 10:
-        score += 20
-        actions.append("Improve content depth + internal linking")
+    if impressions > 10000 and ctr < 1:
+        flags.append("intent_issue")
 
-    if clicks < 10:
-        score += 10
-        actions.append("Expand content + FAQs")
-
-    if score >= 60:
-        priority = "HIGH 🔴"
-    elif score >= 30:
-        priority = "MEDIUM 🟠"
-    else:
-        priority = "LOW 🟢"
-
-    return priority, actions
+    return flags
 
 
 # -----------------------------
-# QUERY ANALYSIS (NEW)
+# GROQ AI ANALYSIS
 # -----------------------------
-def query_analysis(query, clicks, impressions, ctr, position):
+def groq_analysis(data):
 
-    suggestions = []
+    prompt = f"""
+You are a senior SEO strategist.
 
-    if impressions > 500 and ctr < 2:
-        suggestions.append("Improve title targeting this query")
+Analyze this Google Search Console row:
 
-    if position > 10:
-        suggestions.append(f"Create dedicated section for: '{query}'")
+{data}
 
-    if clicks < 5 and impressions > 100:
-        suggestions.append(f"Content mismatch — align content with '{query}' intent")
+Return:
+1. Root cause
+2. Exact fix (no generic advice)
+3. Priority (High/Medium/Low)
+4. Expected impact
+"""
 
-    if not suggestions:
-        suggestions.append("No major issue")
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": "You are an expert SEO consultant."},
+            {"role": "user", "content": prompt}
+        ]
+    )
 
-    return " | ".join(suggestions)
+    return response.choices[0].message.content
 
 
 # -----------------------------
-# MAIN
+# FILE UPLOAD
 # -----------------------------
+file = st.file_uploader("Upload GSC CSV", type=["csv"])
+
 if file:
 
     df = pd.read_csv(file)
 
-    st.success("File uploaded successfully ✔")
-
-    st.write("### 📄 Raw Data Preview")
-    st.dataframe(df)
-
-    # -----------------------------
-    # MODE DETECTION
-    # -----------------------------
-    mode = st.selectbox("Choose Analysis Mode", ["Pages", "Queries"])
+    st.subheader("📄 Raw Data")
+    st.dataframe(df, use_container_width=True)
 
     results = []
 
-    # -----------------------------
-    # PAGE MODE
-    # -----------------------------
-    if mode == "Pages":
+    for _, row in df.iterrows():
 
-        for _, row in df.iterrows():
+        clicks = clean_number(row.get("Clicks", 0))
+        impressions = clean_number(row.get("Impressions", 0))
+        ctr = clean_number(row.get("CTR", 0))
+        position = clean_number(row.get("Position", 0))
 
-            clicks = clean_number(row.get("Clicks", 0))
-            impressions = clean_number(row.get("Impressions", 0))
-            ctr = clean_number(row.get("CTR", 0))
-            position = clean_number(row.get("Position", 0))
+        page = row.get("Top pages") or row.get("Page") or "Unknown"
 
-            priority, actions = page_analysis(clicks, impressions, ctr, position)
+        # -----------------------------
+        # STEP 1: RULE FILTER
+        # -----------------------------
+        flags = rule_engine(clicks, impressions, ctr, position)
 
-            page = (
-                row.get("Top pages")
-                or row.get("Page")
-                or row.get("Landing Page")
-                or row.get("URL")
-                or "Unknown Page"
-            )
+        # Only send important rows to AI
+        if flags:
 
-            results.append({
+            ai_input = {
                 "Page": page,
                 "Clicks": clicks,
                 "Impressions": impressions,
                 "CTR": ctr,
                 "Position": position,
-                "Priority": priority,
-                "Recommendations": " | ".join(actions)
-            })
+                "Detected Issues": flags
+            }
 
-    # -----------------------------
-    # QUERY MODE (NEW)
-    # -----------------------------
-    else:
+            # -----------------------------
+            # STEP 2: GROQ AI ANALYSIS
+            # -----------------------------
+            ai_result = groq_analysis(ai_input)
 
-        for _, row in df.iterrows():
+        else:
+            ai_result = "No major issues detected"
 
-            query = row.get("Query") or row.get("Top queries") or "Unknown Query"
-
-            clicks = clean_number(row.get("Clicks", 0))
-            impressions = clean_number(row.get("Impressions", 0))
-            ctr = clean_number(row.get("CTR", 0))
-            position = clean_number(row.get("Position", 0))
-
-            suggestion = query_analysis(query, clicks, impressions, ctr, position)
-
-            results.append({
-                "Query": query,
-                "Clicks": clicks,
-                "Impressions": impressions,
-                "CTR": ctr,
-                "Position": position,
-                "Suggestions": suggestion
-            })
+        results.append({
+            "Page": page,
+            "Clicks": clicks,
+            "Impressions": impressions,
+            "CTR": ctr,
+            "Position": position,
+            "AI Insights": ai_result
+        })
 
     result_df = pd.DataFrame(results)
 
-    # -----------------------------
-    # FILTER
-    # -----------------------------
-    st.subheader("📊 Results")
+    st.subheader("📊 AI SEO Insights")
 
     st.dataframe(result_df, use_container_width=True)
 
-    # -----------------------------
-    # DOWNLOAD
-    # -----------------------------
+    # Download
     st.download_button(
         "📥 Download Report",
         result_df.to_csv(index=False),
-        "seo_insights_report.csv",
+        "ai_seo_report.csv",
         mime="text/csv"
     )
