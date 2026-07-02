@@ -11,11 +11,11 @@ st.title("🚀 AI SEO Content Intelligence (Groq Powered)")
 st.caption("Hybrid SEO Engine: Rules + AI Insights")
 
 # -----------------------------
-# GROQ CLIENT (USE SECRETS IN PRODUCTION)
+# GROQ CLIENT (SAFE)
 # -----------------------------
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "PASTE_YOUR_KEY_HERE")
-
-client = Groq(api_key=GROQ_API_KEY)
+client = Groq(
+    api_key=st.secrets["GROQ_API_KEY"]
+)
 
 # -----------------------------
 # CLEAN FUNCTION
@@ -28,9 +28,8 @@ def clean_number(v):
     except:
         return 0
 
-
 # -----------------------------
-# RULE ENGINE (FAST FILTER)
+# RULE ENGINE
 # -----------------------------
 def rule_engine(clicks, impressions, ctr, position):
     flags = []
@@ -46,13 +45,13 @@ def rule_engine(clicks, impressions, ctr, position):
 
     return flags
 
-
 # -----------------------------
-# GROQ AI ANALYSIS
+# AI FUNCTION
 # -----------------------------
 def groq_analysis(data):
+
     prompt = f"""
-You are a senior SEO strategist.
+You are an expert SEO strategist.
 
 Analyze this Google Search Console data:
 
@@ -60,40 +59,36 @@ Analyze this Google Search Console data:
 
 Return:
 1. Root cause
-2. Exact fix (no generic advice)
+2. Exact fix
 3. Priority (High/Medium/Low)
-4. Expected impact on traffic
+4. Expected impact
 """
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
-            {"role": "system", "content": "You are an expert SEO consultant."},
+            {"role": "system", "content": "You are a senior SEO expert."},
             {"role": "user", "content": prompt}
         ]
     )
 
     return response.choices[0].message.content
 
-
 # -----------------------------
-# FILE UPLOAD
+# UPLOAD
 # -----------------------------
 file = st.file_uploader("Upload GSC CSV", type=["csv"])
 
 if file:
 
     df = pd.read_csv(file)
-
-    # LIMIT FOR SPEED (VERY IMPORTANT)
     df = df.head(25)
 
-    st.subheader("📄 Raw Data Preview")
+    st.subheader("📄 Raw Data")
     st.dataframe(df, use_container_width=True)
 
     results = []
 
-    # FAST LOOP
     for row in df.itertuples():
 
         clicks = clean_number(getattr(row, "Clicks", 0))
@@ -103,10 +98,8 @@ if file:
 
         page = getattr(row, "Top_pages", None) or getattr(row, "Page", None) or "Unknown"
 
-        # RULE FILTER FIRST
         flags = rule_engine(clicks, impressions, ctr, position)
 
-        # AI ONLY FOR IMPORTANT ROWS
         if flags:
             ai_input = {
                 "Page": page,
@@ -133,12 +126,11 @@ if file:
     result_df = pd.DataFrame(results)
 
     st.subheader("📊 AI SEO Insights")
-
     st.dataframe(result_df, use_container_width=True)
 
     st.download_button(
         "📥 Download Report",
         result_df.to_csv(index=False),
-        "ai_seo_report.csv",
+        "seo_report.csv",
         mime="text/csv"
     )
